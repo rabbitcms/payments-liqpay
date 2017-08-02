@@ -1,0 +1,24 @@
+{
+    "name": "rabbitcms/payments-liqpay",
+    "description": "LiqPay payments provider.",
+    "require": {
+        "rabbitcms/payments": "^1.0"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dmytro Kulyk",
+            "email": "lnkvisitor.ts@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "RabbitCMS\\Payments\\LiqPay\\": "src/"
+        }
+    },
+    "extra": {
+        "module": {
+            "providers": "RabbitCMS\\Payments\\LiqPay\\ModuleProvider"
+        }
+    }
+}
