@@ -120,14 +120,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         //        $params['info'] = $payment->getInfo();
         $params['result_url'] = $payment->getReturnUrl();
 
-        $transaction = new Transaction([
-            'type' => Transaction::TYPE_PAYMENT,
-            'status' => Transaction::STATUS_PENDING
-        ]);
-
-        $transaction->order()->associate($order);
-
-        $transaction->save();
+        $transaction = $this->makeTransaction($order, $payment);
 
         $params['order_id'] = $transaction->getTransactionId();
 
