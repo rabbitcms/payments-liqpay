@@ -3,7 +3,10 @@ declare(strict_types=1);
 
 namespace RabbitCMS\Payments\LiqPay;
 
+use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\RequestOptions;
+use Illuminate\Support\Str;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -16,6 +19,7 @@ use RabbitCMS\Payments\Entities\Transaction;
 use RabbitCMS\Payments\Support\Action;
 use function GuzzleHttp\json_decode;
 use RabbitCMS\Payments\Support\Invoice;
+use RuntimeException;
 
 /**
  * Class LiqPayPaymentProvider
@@ -140,6 +144,8 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
     public function callback(ServerRequestInterface $request): ResponseInterface
     {
         $data = $request->getParsedBody();
+        /** @noinspection ReturnFalseInspection */
+        /** @noinspection ReturnNullInspection */
         $params = json_decode(base64_decode($data['data']), true);
         if ($params['version'] !== self::VERSION) {
             throw new RuntimeException('Invalid version.');
@@ -193,6 +199,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             RequestOptions::FORM_PARAMS => $this->buildData($params)
         ]);
 
+        /** @noinspection ReturnNullInspection */
         return json_decode($response->getBody()->getContents());
     }
 
