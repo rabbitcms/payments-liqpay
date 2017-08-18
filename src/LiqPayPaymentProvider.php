@@ -92,7 +92,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             foreach ([
                          'first_name',
                          'last_name',
-                         'Country' => 'country_code',
+                        // 'Country' => 'country_code',
                          'city',
                          'address',
                          'postal_code'
