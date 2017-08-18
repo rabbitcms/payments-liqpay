@@ -8,7 +8,6 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerAwareTrait;
 use RabbitCMS\Payments\Concerns\PaymentProvider;
-use RabbitCMS\Payments\Contracts\ActionInterface;
 use RabbitCMS\Payments\Contracts\ContinuableInterface;
 use RabbitCMS\Payments\Contracts\InvoiceInterface;
 use RabbitCMS\Payments\Contracts\OrderInterface;
@@ -60,7 +59,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             call_user_func($callback, $payment, $this);
         }
         $params = [
-            'version' => LiqPay::VERSION,
+            'version' => self::VERSION,
             'public_key' => $this->config('public_key'),
             'server_url' => $this->getCallbackUrl(),
             'action' => 'pay',
