@@ -92,7 +92,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             foreach ([
                          'first_name',
                          'last_name',
-                        // 'Country' => 'country_code',
+                         // 'Country' => 'country_code',
                          'city',
                          'address',
                          'postal_code'
@@ -205,5 +205,13 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
     {
         $key = $this->config('private_key');
         return base64_encode(sha1("{$key}{$request}{$key}", true));
+    }
+
+    /**
+     * @return bool
+     */
+    public function isValid(): bool
+    {
+        return !empty($this->config('private_key')) && !empty($this->config('public_key'));
     }
 }
