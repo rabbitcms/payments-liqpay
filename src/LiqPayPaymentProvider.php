@@ -51,12 +51,12 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
 
     /**
      * @param OrderInterface $order
-     *
      * @param callable|null  $callback
+     * @param array          $options
      *
      * @return ContinuableInterface
      */
-    public function createPayment(OrderInterface $order, callable $callback = null): ContinuableInterface
+    public function createPayment(OrderInterface $order, callable $callback = null, array $options = []): ContinuableInterface
     {
         $payment = $order->getPayment();
         if ($callback) {
@@ -120,7 +120,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         //        $params['info'] = $payment->getInfo();
         $params['result_url'] = $payment->getReturnUrl();
 
-        $transaction = $this->makeTransaction($order, $payment);
+        $transaction = $this->makeTransaction($order, $payment, $options);
 
         $params['order_id'] = $transaction->getTransactionId();
 
