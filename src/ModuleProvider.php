@@ -9,8 +9,6 @@ use RabbitCMS\Payments\Factory;
 
 /**
  * Class ModuleProvider
- *
- * @package RabbitCMS\Payments\LiqPay
  */
 class ModuleProvider extends ServiceProvider
 {

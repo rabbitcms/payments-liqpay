@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace RabbitCMS\Payments\LiqPay;
@@ -17,14 +18,12 @@ use RabbitCMS\Payments\Contracts\OrderInterface;
 use RabbitCMS\Payments\Contracts\PaymentProviderInterface;
 use RabbitCMS\Payments\Entities\Transaction;
 use RabbitCMS\Payments\Support\Action;
-use function GuzzleHttp\json_decode;
 use RabbitCMS\Payments\Support\Invoice;
 use RuntimeException;
+use function GuzzleHttp\json_decode;
 
 /**
  * Class LiqPayPaymentProvider
- *
- * @package RabbitCMS\Payments\LiqPay
  */
 class LiqPayPaymentProvider implements PaymentProviderInterface
 {
@@ -37,25 +36,16 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
     protected static $statuses = [
         'failure' => InvoiceInterface::STATUS_FAILURE,
         'success' => InvoiceInterface::STATUS_SUCCESSFUL,
+        'sandbox' => InvoiceInterface::STATUS_SUCCESSFUL,
         'reversed' => InvoiceInterface::STATUS_REFUND,
-        'refund' => InvoiceInterface::STATUS_REFUND
+        'refund' => InvoiceInterface::STATUS_REFUND,
     ];
 
-    /**
-     * @return string
-     */
     public function getProviderName(): string
     {
         return 'liqpay';
     }
 
-    /**
-     * @param OrderInterface $order
-     * @param callable|null  $callback
-     * @param array          $options
-     *
-     * @return ContinuableInterface
-     */
     public function createPayment(OrderInterface $order, callable $callback = null, array $options = []): ContinuableInterface
     {
         $payment = $order->getPayment();
@@ -74,7 +64,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
 
         $payTypes = $this->config('paytypes');
 
-        if (!empty($payTypes)) {
+        if (! empty($payTypes)) {
             $params['paytypes'] = $payTypes;
         }
 
@@ -86,7 +76,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
 
         if ($client !== null) {
             $identifier = $client->getId();
-            if (!empty($identifier)) {
+            if (! empty($identifier)) {
                 $params['customer'] = $identifier;
             }
             foreach ([
@@ -95,7 +85,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
                          // 'Country' => 'country_code',
                          'city',
                          'address',
-                         'postal_code'
+                         'postal_code',
                      ] as $property => $field) {
                 $property = is_int($property) ? Str::camel($field) : $property;
                 $value = $client->{"get{$property}"}();
@@ -125,15 +115,10 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         $params['order_id'] = $transaction->getTransactionId();
 
         return (new Action($this, Action::ACTION_OPEN, $this->buildData($params)))
-            ->setUrl(self::URL . '3/checkout')
+            ->setUrl(self::URL.'3/checkout')
             ->setMethod(Action::METHOD_POST);
     }
 
-    /**
-     * @param ServerRequestInterface $request
-     *
-     * @return ResponseInterface
-     */
     public function callback(ServerRequestInterface $request): ResponseInterface
     {
         $data = $request->getParsedBody();
@@ -154,64 +139,47 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         if (array_key_exists($params['status'], self::$statuses)) {
             $this->manager->process(new Invoice(
                 $this,
-                (string)$params['payment_id'],
-                (string)$params['order_id'],
+                (string) $params['payment_id'],
+                (string) $params['order_id'],
                 Transaction::TYPE_PAYMENT,
-                (int)self::$statuses[$params['status']],
-                (float)$params['amount']
+                (int) self::$statuses[$params['status']],
+                (float) $params['amount'],
+                (float) $params['receiver_commission'] ?? 0
             ));
         }
+
         return new Response();
     }
 
-    /**
-     * @param array $params
-     *
-     * @return array
-     */
     protected function buildData(array $params = []): array
     {
         $data = base64_encode(json_encode($params));
+
         return [
             'data' => $data,
             'signature' => $this->sign($data),
         ];
     }
 
-    /**
-     * Call API
-     *
-     * @param string $path
-     * @param array  $params
-     *
-     * @return array
-     */
     public function api(string $path, array $params = []): array
     {
-        $response = (new Client())->request('POST', static::URL . $path, [
-            RequestOptions::FORM_PARAMS => $this->buildData($params)
+        $response = (new Client())->request('POST', static::URL.$path, [
+            RequestOptions::FORM_PARAMS => $this->buildData($params),
         ]);
 
         /** @noinspection ReturnNullInspection */
         return json_decode($response->getBody()->getContents());
     }
 
-    /**
-     * @param string $request
-     *
-     * @return string
-     */
     protected function sign(string $request): string
     {
         $key = $this->config('private_key');
+
         return base64_encode(sha1("{$key}{$request}{$key}", true));
     }
 
-    /**
-     * @return bool
-     */
     public function isValid(): bool
     {
-        return !empty($this->config('private_key')) && !empty($this->config('public_key'));
+        return ! empty($this->config('private_key')) && ! empty($this->config('public_key'));
     }
 }
