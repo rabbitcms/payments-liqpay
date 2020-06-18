@@ -137,14 +137,15 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         }
 
         if (array_key_exists($params['status'], self::$statuses)) {
+
             $this->manager->process(new Invoice(
                 $this,
                 (string) $params['payment_id'],
                 (string) $params['order_id'],
-                Transaction::TYPE_PAYMENT,
+                $params['status'] === 'reversed' ? Transaction::TYPE_REFUND : Transaction::TYPE_PAYMENT,
                 (int) self::$statuses[$params['status']],
-                (float) $params['amount'],
-                (float) $params['receiver_commission'] ?? 0
+                (float) $params['status'] === 'reversed' ? $params['refund_amount'] : $params['amount'],
+                $params['status'] === 'reversed' ? 0 : (float) $params['receiver_commission'] ?? 0
             ));
         }
 
