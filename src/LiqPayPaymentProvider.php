@@ -16,6 +16,7 @@ use RabbitCMS\Payments\Contracts\ContinuableInterface;
 use RabbitCMS\Payments\Contracts\InvoiceInterface;
 use RabbitCMS\Payments\Contracts\OrderInterface;
 use RabbitCMS\Payments\Contracts\PaymentProviderInterface;
+use RabbitCMS\Payments\Contracts\SubscribePaymentInterface;
 use RabbitCMS\Payments\Entities\Transaction;
 use RabbitCMS\Payments\Support\Action;
 use RabbitCMS\Payments\Support\Invoice;
@@ -39,6 +40,8 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         'sandbox' => InvoiceInterface::STATUS_SUCCESSFUL,
         'reversed' => InvoiceInterface::STATUS_REFUND,
         'refund' => InvoiceInterface::STATUS_REFUND,
+        'subscribed' => InvoiceInterface::STATUS_SUCCESSFUL,
+        'unsubscribed' => InvoiceInterface::STATUS_REFUND,
     ];
 
     public function getProviderName(): string
@@ -48,6 +51,10 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
 
     public function createPayment(OrderInterface $order, callable $callback = null, array $options = []): ContinuableInterface
     {
+        $periods = [
+            SubscribePaymentInterface::PERIODICITY_MONTH => 'month',
+            SubscribePaymentInterface::PERIODICITY_YEAR => 'year',
+        ];
         $payment = $order->getPayment();
         if ($callback) {
             call_user_func($callback, $payment, $this);
@@ -61,6 +68,18 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             'amount' => $payment->getAmount(),
             'description' => $payment->getDescription(),
         ];
+        if ($payment instanceof SubscribePaymentInterface) {
+            if (! array_key_exists($payment->getSubscribePeriodic(), $periods)) {
+                throw new RuntimeException('LiqPay supports only PERIODICITY_MONTH and PERIODICITY_YEAR periodicity');
+            }
+
+            $date = $payment->getSubscribeStart();
+            $params['subscribe'] = '1';
+            $params['subscribe_date_start'] = \DateTime::createFromFormat('Y-m-d H:i:s', $date->format('Y-m-d H:i:s'), $date->getTimezone())
+                ->setTimezone('UTC')
+                ->format('Y-m-d H:i:s');
+            $params['subscribe_periodicity'] = $periods[$payment->getSubscribePeriodic()];
+        }
 
         $payTypes = $this->config('paytypes');
 
@@ -110,7 +129,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         //        $params['info'] = $payment->getInfo();
         $params['result_url'] = $payment->getReturnUrl();
 
-        $transaction = $this->makeTransaction($order, $payment, $options);
+        $transaction = $this->makeTransaction($order, $payment, $options, $payment instanceof SubscribePaymentInterface);
 
         $params['order_id'] = $transaction->getTransactionId();
 
