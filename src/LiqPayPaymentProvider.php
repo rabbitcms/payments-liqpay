@@ -76,7 +76,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             $date = $payment->getSubscribeStart();
             $params['subscribe'] = '1';
             $params['subscribe_date_start'] = \DateTime::createFromFormat('Y-m-d H:i:s', $date->format('Y-m-d H:i:s'), $date->getTimezone())
-                ->setTimezone('UTC')
+                ->setTimezone(new \DateTimeZone('UTC'))
                 ->format('Y-m-d H:i:s');
             $params['subscribe_periodicity'] = $periods[$payment->getSubscribePeriodic()];
         }
