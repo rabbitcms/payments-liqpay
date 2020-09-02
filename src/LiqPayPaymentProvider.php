@@ -17,6 +17,7 @@ use RabbitCMS\Payments\Contracts\InvoiceInterface;
 use RabbitCMS\Payments\Contracts\OrderInterface;
 use RabbitCMS\Payments\Contracts\PaymentProviderInterface;
 use RabbitCMS\Payments\Contracts\SubscribePaymentInterface;
+use RabbitCMS\Payments\Contracts\TransactionInterface;
 use RabbitCMS\Payments\Entities\Transaction;
 use RabbitCMS\Payments\Support\Action;
 use RabbitCMS\Payments\Support\Invoice;
@@ -41,7 +42,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         'reversed' => InvoiceInterface::STATUS_REFUND,
         'refund' => InvoiceInterface::STATUS_REFUND,
         'subscribed' => InvoiceInterface::STATUS_SUCCESSFUL,
-        'unsubscribed' => InvoiceInterface::STATUS_REFUND,
+        'unsubscribed' => InvoiceInterface::STATUS_CANCELED,
     ];
 
     public function getProviderName(): string
@@ -74,6 +75,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             }
 
             $date = $payment->getSubscribeStart();
+            $params['action'] = 'subscribe';
             $params['subscribe'] = '1';
             $params['subscribe_date_start'] = \DateTime::createFromFormat('Y-m-d H:i:s', $date->format('Y-m-d H:i:s'), $date->getTimezone())
                 ->setTimezone(new \DateTimeZone('UTC'))
@@ -106,7 +108,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
                          'address',
                          'postal_code',
                      ] as $property => $field) {
-                $property = is_int($property) ? Str::camel($field) : $property;
+                $property = is_int($property) ? Str::studly($field) : $property;
                 $value = $client->{"get{$property}"}();
                 if ($value !== '') {
                     $params["sender_{$field}"] = $value;
@@ -118,7 +120,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
 
         if ($product !== null) {
             foreach (['url', 'category', 'name', 'description'] as $field) {
-                $property = Str::camel($field);
+                $property = Str::studly($field);
                 $value = $product->{"get{$property}"}();
                 if ($value !== '') {
                     $params["product_{$field}"] = $value;
@@ -155,13 +157,39 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             throw new RuntimeException('Invalid signature');
         }
 
-        if (array_key_exists($params['status'], self::$statuses)) {
+        if ($params['action'] === 'subscribe') {
+            if (array_key_exists($params['status'], self::$statuses)) {
+                $this->manager->process(new Invoice(
+                    $this,
+                    (string) $params['payment_id'],
+                    (string) $params['order_id'],
+                    TransactionInterface::TYPE_SUBSCRIPTION,
+                    (int) self::$statuses[$params['status']],
+                    0
+                ));
+
+                if ($params['status'] === 'subscribed') {
+                    $this->manager->process(new Invoice(
+                        $this,
+                        (string) $params['payment_id'],
+                        (string) $params['order_id'],
+                        TransactionInterface::TYPE_PAYMENT,
+                        TransactionInterface::STATUS_SUCCESSFUL,
+                        (float) $params['amount'],
+                        (float) $params['receiver_commission']
+                    ));
+                }
+            }
+        } elseif (array_key_exists($params['status'], self::$statuses)) {
+            $type = $params['status'] === 'reversed'
+                ? TransactionInterface::TYPE_REFUND
+                : TransactionInterface::TYPE_PAYMENT;
 
             $this->manager->process(new Invoice(
                 $this,
                 (string) $params['payment_id'],
                 (string) $params['order_id'],
-                $params['status'] === 'reversed' ? Transaction::TYPE_REFUND : Transaction::TYPE_PAYMENT,
+                $type,
                 (int) self::$statuses[$params['status']],
                 (float) $params['status'] === 'reversed' ? $params['refund_amount'] : $params['amount'],
                 $params['status'] === 'reversed' ? 0 : (float) $params['receiver_commission'] ?? 0
