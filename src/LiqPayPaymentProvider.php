@@ -7,6 +7,7 @@ namespace RabbitCMS\Payments\LiqPay;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\RequestOptions;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -33,7 +34,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
     use PaymentProvider;
 
     const VERSION = 3;
-    const URL = 'https://www.liqpay.com/api/';
+    const URL = 'https://www.liqpay.ua/api/';
 
     protected static $statuses = [
         'failure' => InvoiceInterface::STATUS_FAILURE,
@@ -167,18 +168,6 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
                     (int) self::$statuses[$params['status']],
                     0
                 ));
-
-                if ($params['status'] === 'subscribed') {
-                    $this->manager->process(new Invoice(
-                        $this,
-                        (string) $params['payment_id'],
-                        (string) $params['order_id'],
-                        TransactionInterface::TYPE_PAYMENT,
-                        TransactionInterface::STATUS_SUCCESSFUL,
-                        (float) $params['amount'],
-                        (float) $params['receiver_commission']
-                    ));
-                }
             }
         } elseif (array_key_exists($params['status'], self::$statuses)) {
             $type = $params['status'] === 'reversed'
@@ -209,9 +198,38 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         ];
     }
 
+    /**
+     * @param  OrderInterface|Model  $order
+     */
+    public function unsubscribe(OrderInterface $order): bool
+    {
+        /* @var Transaction $transaction */
+        $transaction = Transaction::query()->where([
+            'order_type' => $order->getMorphClass(),
+            'order_id' => $order->getKey(),
+            'driver' => $this->getShop(),
+        ])
+            ->whereNull('parent_id')
+            ->firstOrFail();
+        if ($transaction->getStatus() === Transaction::STATUS_CANCELED) {
+            return true;
+        }
+
+        $result = $this->api('request', [
+            'version' => self::VERSION,
+            'public_key' => $this->config('public_key'),
+            'action' => 'unsubscribe',
+            'order_id' => $transaction->getTransactionId(),
+        ]);
+
+        return $result['status'] === 'unsubscribed';
+    }
+
     public function api(string $path, array $params = []): array
     {
-        $response = (new Client())->request('POST', static::URL.$path, [
+        $response = (new Client([
+            RequestOptions::VERIFY => true,
+        ]))->request('POST', static::URL.$path, [
             RequestOptions::FORM_PARAMS => $this->buildData($params),
         ]);
 

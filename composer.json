@@ -2,7 +2,7 @@
     "name": "rabbitcms/payments-liqpay",
     "description": "LiqPay payments provider.",
     "require": {
-        "rabbitcms/payments": "^1.3.0"
+        "rabbitcms/payments": "^1.3.3"
     },
     "license": "MIT",
     "authors": [
