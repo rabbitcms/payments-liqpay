@@ -234,7 +234,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         ]);
 
         /** @noinspection ReturnNullInspection */
-        return json_decode($response->getBody()->getContents());
+        return json_decode($response->getBody()->getContents(), true);
     }
 
     protected function sign(string $request): string
