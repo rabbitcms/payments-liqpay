@@ -181,7 +181,7 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
                 $type,
                 (int) self::$statuses[$params['status']],
                 (float) $params['status'] === 'reversed' ? $params['refund_amount'] : $params['amount'],
-                $params['status'] === 'reversed' ? 0 : (float) $params['receiver_commission'] ?? 0
+                $params['status'] === 'reversed' ? 0 : (float) ($params['receiver_commission'] ?? 0)
             ));
         }
 
