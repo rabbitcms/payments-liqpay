@@ -1,9 +1,6 @@
 {
     "name": "rabbitcms/payments-liqpay",
     "description": "LiqPay payments provider.",
-    "require": {
-        "rabbitcms/payments": "^1.3.3"
-    },
     "license": "MIT",
     "authors": [
         {
@@ -11,6 +8,13 @@
             "email": "lnkvisitor.ts@gmail.com"
         }
     ],
+    "require": {
+        "guzzlehttp/guzzle": "^6.5 || ^7.2",
+        "rabbitcms/payments": "^1.3.3"
+    },
+    "provide": {
+        "rabbitcms/payments-provider": "1.0"
+    },
     "autoload": {
         "psr-4": {
             "RabbitCMS\\Payments\\LiqPay\\": "src/"
