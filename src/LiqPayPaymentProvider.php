@@ -9,25 +9,22 @@ use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\RequestOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
+use Laravel\Nova\Fields\{Boolean, BooleanGroup, Password, Select, Text};
+use Laravel\Nova\Http\Requests\NovaRequest;
+use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Log\LoggerAwareTrait;
 use RabbitCMS\Payments\Concerns\PaymentProvider;
-use RabbitCMS\Payments\Contracts\ContinuableInterface;
-use RabbitCMS\Payments\Contracts\InvoiceInterface;
-use RabbitCMS\Payments\Contracts\OrderInterface;
-use RabbitCMS\Payments\Contracts\PaymentProviderInterface;
-use RabbitCMS\Payments\Contracts\SubscribePaymentInterface;
-use RabbitCMS\Payments\Contracts\TransactionInterface;
+use RabbitCMS\Payments\Contracts\{ContinuableInterface,
+    InvoiceInterface,
+    OrderInterface,
+    PaymentProviderInterface,
+    SubscribePaymentInterface,
+    TransactionInterface};
 use RabbitCMS\Payments\Entities\Transaction;
-use RabbitCMS\Payments\Support\Action;
-use RabbitCMS\Payments\Support\Invoice;
+use RabbitCMS\Payments\Support\{Action, Invoice};
 use RuntimeException;
 use function GuzzleHttp\json_decode;
 
-/**
- * Class LiqPayPaymentProvider
- */
 class LiqPayPaymentProvider implements PaymentProviderInterface
 {
     use LoggerAwareTrait;
@@ -51,8 +48,11 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         return 'liqpay';
     }
 
-    public function createPayment(OrderInterface $order, callable $callback = null, array $options = []): ContinuableInterface
-    {
+    public function createPayment(
+        OrderInterface $order,
+        callable $callback = null,
+        array $options = []
+    ): ContinuableInterface {
         $periods = [
             SubscribePaymentInterface::PERIODICITY_MONTH => 'month',
             SubscribePaymentInterface::PERIODICITY_YEAR => 'year',
@@ -78,7 +78,8 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             $date = $payment->getSubscribeStart();
             $params['action'] = 'subscribe';
             $params['subscribe'] = '1';
-            $params['subscribe_date_start'] = \DateTime::createFromFormat('Y-m-d H:i:s', $date->format('Y-m-d H:i:s'), $date->getTimezone())
+            $params['subscribe_date_start'] = \DateTime::createFromFormat('Y-m-d H:i:s', $date->format('Y-m-d H:i:s'),
+                $date->getTimezone())
                 ->setTimezone(new \DateTimeZone('UTC'))
                 ->format('Y-m-d H:i:s');
             $params['subscribe_periodicity'] = $periods[$payment->getSubscribePeriodic()];
@@ -132,7 +133,8 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
         //        $params['info'] = $payment->getInfo();
         $params['result_url'] = $payment->getReturnUrl();
 
-        $transaction = $this->makeTransaction($order, $payment, $options, $payment instanceof SubscribePaymentInterface);
+        $transaction = $this->makeTransaction($order, $payment, $options,
+            $payment instanceof SubscribePaymentInterface);
 
         $params['order_id'] = $transaction->getTransactionId();
 
@@ -247,5 +249,43 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
     public function isValid(): bool
     {
         return ! empty($this->config('private_key')) && ! empty($this->config('public_key'));
+    }
+
+    public function getNovaFields(NovaRequest $request): array
+    {
+        return [
+            Text::make('Публічний ключ', 'public_key')->rules(['required']),
+            Password::make('Приватний ключ', 'private_key')
+                ->fillUsing(function ($request, $model, $attribute, $requestAttribute) {
+                    if (! empty($request[$requestAttribute])) {
+                        $model->{$attribute} = $request[$requestAttribute];
+                    }
+                })
+                ->creationRules(['required']),
+            Select::make('Валюта', 'currency')
+                ->options([
+                    'UAH' => 'Гривня',
+                    'EUR' => 'Євро',
+                    'USD' => 'Долар',
+                ])
+                ->displayUsingLabels()
+                ->default('UAH'),
+            BooleanGroup::make('Методи', 'paytypes')
+                ->resolveUsing(fn($value) => empty($value) ? null : array_fill_keys(explode(',',$value), true))
+                ->fillUsing(function (NovaRequest $request, $model, $attribute, $requestAttribute) {
+                    if ($request->exists($requestAttribute)) {
+                        $values = array_filter(json_decode($request[$requestAttribute], true));
+                        $model->{$attribute} = empty($values) ? null : implode(',',array_keys($values));
+                    }
+                })
+                ->options([
+                    'card' => 'Картка',
+                    'privat24' => 'Приват24',
+                    'liqpay' => 'LiqPay',
+                    'invoice' => 'Рахунок',
+                    'cash' => 'Готівка',
+                ]),
+            Boolean::make('Sandbox', 'sandbox'),
+        ];
     }
 }
