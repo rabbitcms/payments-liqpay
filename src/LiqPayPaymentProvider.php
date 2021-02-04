@@ -285,7 +285,6 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
                     'invoice' => 'Рахунок',
                     'cash' => 'Готівка',
                 ]),
-            Boolean::make('Sandbox', 'sandbox'),
         ];
     }
 }
