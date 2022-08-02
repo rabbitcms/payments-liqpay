@@ -21,6 +21,7 @@ use RabbitCMS\Payments\Contracts\{ContinuableInterface,
     SubscribePaymentInterface,
     TransactionInterface};
 use RabbitCMS\Payments\Entities\Transaction;
+use RabbitCMS\Payments\LiqPay\Events\LiqPayPaymentParamsEvent;
 use RabbitCMS\Payments\Support\{Action, Invoice};
 use RuntimeException;
 use function GuzzleHttp\json_decode;
@@ -137,6 +138,11 @@ class LiqPayPaymentProvider implements PaymentProviderInterface
             $payment instanceof SubscribePaymentInterface);
 
         $params['order_id'] = $transaction->getTransactionId();
+
+        $modifiedParamsArr = event(new LiqPayPaymentParamsEvent($params, $order));
+        if (!empty($modifiedParamsArr)) {
+            $params = $modifiedParamsArr[0];
+        }
 
         return (new Action($this, Action::ACTION_OPEN, $this->buildData($params)))
             ->setUrl(self::URL.'3/checkout')
